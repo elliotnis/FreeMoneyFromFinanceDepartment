@@ -91,7 +91,7 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
           ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
-          CORS_ORIGIN_REGEX: ${{ vars.CORS_ORIGIN_REGEX || 'https://.*\\.a\\.run\\.app$' }}
+          CORS_ORIGIN_REGEX: ${{ vars.CORS_ORIGIN_REGEX || 'https://.*\\.run\\.app$' }}
         run: |
           gcloud run deploy "${API_SERVICE}" \
             --image "${{ steps.apiimg.outputs.image }}" \
@@ -136,10 +136,20 @@ jobs:
             --min-instances 0 \
             --max-instances 4
 
+      # Uses the default *.run.app URL unless you set GitHub variable PUBLIC_WEB_URL
+      # (e.g. https://portal.example.com) after Cloud Run custom domain mapping.
       - name: Point API at web URL (CORS + magic-link FRONTEND_URL)
+        env:
+          PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }}
         run: |
-          WEB_URL=$(gcloud run services describe "${WEB_SERVICE}" --region "${REGION}" --format 'value(status.url)')
-          echo "Web URL: ${WEB_URL}"
+          if [ -n "${PUBLIC_WEB_URL}" ]; then
+            WEB_URL="${PUBLIC_WEB_URL}"
+            WEB_URL="${WEB_URL%/}"
+            echo "Using PUBLIC_WEB_URL for API env: ${WEB_URL}"
+          else
+            WEB_URL=$(gcloud run services describe "${WEB_SERVICE}" --region "${REGION}" --format 'value(status.url)')
+            echo "Using Cloud Run default URL: ${WEB_URL}"
+          fi
           gcloud run services update "${API_SERVICE}" \
             --region "${REGION}" \
             --update-env-vars "^|^FRONTEND_URL=${WEB_URL}^|^CORS_ORIGINS=${WEB_URL}"

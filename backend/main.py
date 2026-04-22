@@ -20,6 +20,19 @@ else:
 # Optional regex for managed hosts (e.g. Cloud Run: https://*.a.run.app)
 _cors_regex = os.getenv("CORS_ORIGIN_REGEX", "").strip() or None
 
+# Cloud Run sets K_SERVICE. If CI/env forgot CORS_ORIGINS, the browser still needs a
+# permitted origin for the sibling *.a.run.app web service (different subdomain = CORS).
+_disable_run_regex = os.getenv("DISABLE_CLOUD_RUN_CORS_REGEX", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
+# Cloud Run may expose either *.REGION.run.app (e.g. asia-east2) or *.a.run.app.
+# gcloud often reports one shape in deploy output and another in `services describe`.
+# If users open the "other" URL, CORS must still allow that origin.
+if os.getenv("K_SERVICE") and _cors_regex is None and not _disable_run_regex:
+    _cors_regex = r"https://.*\.run\.app$"
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,

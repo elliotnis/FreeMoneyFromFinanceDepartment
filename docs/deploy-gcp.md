@@ -47,7 +47,10 @@ Pushing to `main` or `master` runs tests, builds Docker images, pushes them to *
 | `CLOUD_RUN_API_SERVICE` | No | `sign-up-api` | API service name. |
 | `CLOUD_RUN_WEB_SERVICE` | No | `sign-up-web` | Web UI service name. |
 | `ARTIFACT_REGISTRY_REPO` | No | `sign-up-system` | Must match the repo you created. |
-| `CORS_ORIGIN_REGEX` | No | `https://.*\.a\.run\.app$` | Lets the SPA call the API before the final CORS URL is written. |
+| `CORS_ORIGIN_REGEX` | No | `https://.*\.run\.app$` | Matches both regional (`*.asia-east2.run.app`) and global (`*.a.run.app`) Cloud Run URLs so CORS works whichever link users open. |
+| `PUBLIC_WEB_URL` | No | `https://portal.example.com` | If set, `FRONTEND_URL` / `CORS_ORIGINS` on the API use this instead of the default `*.run.app` URL (use after **Cloud Run → Custom domains**). |
+
+**sslip.io / nip.io:** These map a hostname to a **raw IP**. Cloud Run’s default URL is **not** a single static IP, and managed TLS does not cover arbitrary sslip hostnames—so they are **not** a practical way to front Cloud Run. Use a **domain you own** and Cloud Run **domain mapping** (Google-managed certificate), then set `PUBLIC_WEB_URL` to that `https://…` URL.
 
 ### Repository secrets
 
