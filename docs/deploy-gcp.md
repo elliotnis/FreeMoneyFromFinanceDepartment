@@ -81,7 +81,8 @@ Open the **web** service URL from the Cloud Run console to use the app.
 - **Deploy job skipped:** set variable `GCP_PROJECT_ID`.
 - **CORS errors:** Check the last workflow step succeeded; confirm `CORS_ORIGINS` on the API service matches the browser origin (your web Cloud Run URL). Add extra origins via `CORS_ORIGINS` in the workflow if you also host the UI elsewhere (e.g. Vercel).
 - **Magic links wrong domain:** `FRONTEND_URL` must be the public web URL; it is updated automatically at the end of each deploy.
-- **MongoDB / SMTP special characters:** If `gcloud --set-env-vars` breaks on `&` or commas, store values in [Secret Manager](https://cloud.google.com/secret-manager) and switch the workflow to `--set-secrets` (advanced).
+- **Stray `^` in variable names in Cloud Run (e.g. `^SMTP_USER`):** Older workflow steps used gcloud’s `^|^` delimiter for `--set-env-vars`; a parsing mismatch can leave literal carets in names so the app never sees `SMTP_USER`. Fix in the console by renaming/removing the `^` characters, or redeploy with the current workflow (it uses `--env-vars-file` instead).
+- **MongoDB / SMTP special characters:** The deploy workflow writes env vars from a YAML file so commas in `ADMIN_EMAILS` are safe. For other edge cases, use [Secret Manager](https://cloud.google.com/secret-manager) and `--set-secrets` (advanced).
 
 ## 5. Cost notes
 

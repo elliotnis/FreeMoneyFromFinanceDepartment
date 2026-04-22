@@ -93,6 +93,28 @@ jobs:
           ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
           CORS_ORIGIN_REGEX: ${{ vars.CORS_ORIGIN_REGEX || 'https://.*\\.run\\.app$' }}
         run: |
+          # Use --env-vars-file so commas in ADMIN_EMAILS and special chars never break
+          # gcloud's ^|^ --set-env-vars delimiter (which can leave stray ^ in names in Cloud Run).
+          python3 <<'PY'
+          import json
+          import os
+
+          out = {
+              "MONGODB_URL": os.environ["MONGODB_URL"],
+              "SMTP_HOST": "smtp.gmail.com",
+              "SMTP_PORT": "587",
+              "SMTP_USER": os.environ["SMTP_USER"],
+              "SMTP_PASSWORD": os.environ["SMTP_PASSWORD"],
+              "SMTP_FROM": os.environ["SMTP_FROM"],
+              "ADMIN_EMAILS": os.environ["ADMIN_EMAILS"],
+              "MAGIC_LINK_TTL_MINUTES": "15",
+              "FRONTEND_URL": "https://placeholder.invalid",
+              "CORS_ORIGIN_REGEX": os.environ["CORS_ORIGIN_REGEX"],
+          }
+          with open("api-env.yaml", "w", encoding="utf-8") as f:
+              for k, v in out.items():
+                  f.write(f"{k}: {json.dumps(v)}\n")
+          PY
           gcloud run deploy "${API_SERVICE}" \
             --image "${{ steps.apiimg.outputs.image }}" \
             --region "${REGION}" \
@@ -102,7 +124,8 @@ jobs:
             --memory 512Mi \
             --min-instances 0 \
             --max-instances 4 \
-            --set-env-vars "^|^MONGODB_URL=${MONGODB_URL}^|^SMTP_HOST=smtp.gmail.com^|^SMTP_PORT=587^|^SMTP_USER=${SMTP_USER}^|^SMTP_PASSWORD=${SMTP_PASSWORD}^|^SMTP_FROM=${SMTP_FROM}^|^ADMIN_EMAILS=${ADMIN_EMAILS}^|^MAGIC_LINK_TTL_MINUTES=15^|^FRONTEND_URL=https://placeholder.invalid^|^CORS_ORIGIN_REGEX=${CORS_ORIGIN_REGEX}"
+            --env-vars-file=api-env.yaml
+          rm -f api-env.yaml
 
       - name: Get API URL
         id: api
@@ -152,4 +175,4 @@ jobs:
           fi
           gcloud run services update "${API_SERVICE}" \
             --region "${REGION}" \
-            --update-env-vars "^|^FRONTEND_URL=${WEB_URL}^|^CORS_ORIGINS=${WEB_URL}"
+            --update-env-vars "FRONTEND_URL=${WEB_URL},CORS_ORIGINS=${WEB_URL}"
