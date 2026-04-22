@@ -10,6 +10,17 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
+# Passwordless email (magic-link) login
+class EmailLinkRequest(BaseModel):
+    username: str  # part before @connect.ust.hk
+
+class EmailLinkVerify(BaseModel):
+    token: str
+
+class SetPasswordRequest(BaseModel):
+    email: str
+    new_password: str
+
 # Profile Management
 class ProfileCreate(BaseModel):
     login_email: str  # User's registered email (used to find the user)
@@ -122,6 +133,44 @@ class ReflectionResponse(BaseModel):
     photo_base64: str
     submitted_at: str
     
+# ==================== Classes (admin-created group classes) ====================
+
+class ClassCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    date: str  # "YYYY-MM-DD"
+    time_slot: str  # "HH:MM-HH:MM"
+    location: str
+    capacity: int
+    created_by: str  # admin email
+
+class ClassUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    date: Optional[str] = None
+    time_slot: Optional[str] = None
+    location: Optional[str] = None
+    capacity: Optional[int] = None
+    requested_by: str
+
+class ClassResponse(BaseModel):
+    id: str
+    title: str
+    description: Optional[str] = None
+    date: str
+    time_slot: str
+    location: str
+    capacity: int
+    registered_count: int
+    seats_left: int
+    is_full: bool
+    registered_students: List[str]
+    created_by: str
+    status: str
+
+class ClassRegister(BaseModel):
+    student_email: str
+
 class VerificationSessionResponse(BaseModel):
     session_id: str
     date: str

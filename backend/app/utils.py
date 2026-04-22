@@ -1,6 +1,25 @@
-from .mongo import user_collection, session_collection, registration_collection, reflection_collection
+import os
+
+from .mongo import (
+    user_collection, session_collection, registration_collection,
+    reflection_collection, class_collection,
+)
 from datetime import datetime
 from bson import ObjectId
+
+
+# ==================== Admin helpers ====================
+
+def get_admin_emails():
+    """Comma-separated ADMIN_EMAILS env var → set of normalized emails."""
+    raw = os.getenv("ADMIN_EMAILS", "")
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+def is_admin(email):
+    if not email:
+        return False
+    return email.strip().lower() in get_admin_emails()
 
 def check_email_exists(email):
     """Check if email already exists in database"""
@@ -20,9 +39,53 @@ def verify_user_credentials(email, password):
     user = user_collection.find_one({"email": email})
     if not user:
         return None
-    if user["password"] != password:
+    stored = user.get("password")
+    if stored is None or stored == "":
+        return None
+    if stored != password:
         return None
     return user
+
+
+def user_password_status(email):
+    """Return whether the account exists and whether it has a password set."""
+    key = email.strip()
+    user = user_collection.find_one({"email": key})
+    if not user and "@" in key:
+        user = user_collection.find_one({"email": key.lower()})
+    if not user:
+        return None
+    p = user.get("password")
+    has_password = p is not None and p != ""
+    return {"exists": True, "has_password": has_password}
+
+
+def set_password_if_passwordless(email, new_password):
+    """
+    Set password for accounts that only had magic-link login (no password yet).
+    Returns: True, or error string: "user_not_found", "already_has_password", "password_too_short"
+    """
+    key = email.strip()
+    if not new_password or len(new_password) < 8:
+        return "password_too_short"
+
+    user = user_collection.find_one({"email": key})
+    if not user and "@" in key:
+        user = user_collection.find_one({"email": key.lower()})
+        if user:
+            key = user["email"]
+    if not user:
+        return "user_not_found"
+
+    stored = user.get("password")
+    if stored is not None and stored != "":
+        return "already_has_password"
+
+    user_collection.update_one(
+        {"email": key},
+        {"$set": {"password": new_password, "auth_method": "password"}},
+    )
+    return True
 
 def get_all_users():
     """Get all users from database (without passwords)"""
@@ -708,3 +771,167 @@ def submit_reflection(session_id, submitted_by, role, other_person_name, attitud
     except Exception as e:
         print(f"Error submitting reflection: {e}")
         return None
+
+# ==================== Classes (admin-created group classes) ====================
+
+def _serialize_class(doc):
+    registered = doc.get("registered_students") or []
+    capacity = int(doc.get("capacity", 0))
+    return {
+        "id": str(doc["_id"]),
+        "title": doc.get("title", ""),
+        "description": doc.get("description"),
+        "date": doc.get("date", ""),
+        "time_slot": doc.get("time_slot", ""),
+        "location": doc.get("location", ""),
+        "capacity": capacity,
+        "registered_count": len(registered),
+        "seats_left": max(0, capacity - len(registered)),
+        "is_full": len(registered) >= capacity,
+        "registered_students": registered,
+        "created_by": doc.get("created_by", ""),
+        "status": doc.get("status", "active"),
+    }
+
+
+def create_class(title, description, date, time_slot, location, capacity, created_by):
+    """Insert a new class. Caller must already have verified admin status."""
+    if capacity is None or int(capacity) <= 0:
+        return "Capacity must be a positive integer"
+
+    now = datetime.utcnow()
+    doc = {
+        "title": title.strip(),
+        "description": (description or "").strip() or None,
+        "date": date,
+        "time_slot": time_slot,
+        "location": location.strip(),
+        "capacity": int(capacity),
+        "registered_students": [],
+        "created_by": created_by.strip().lower(),
+        "status": "active",
+        "created_at": now,
+        "updated_at": now,
+    }
+    result = class_collection.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _serialize_class(doc)
+
+
+def list_classes(date_from=None, date_to=None, status="active"):
+    """List classes, optionally filtered to a date range (inclusive, YYYY-MM-DD)."""
+    query = {"status": status}
+    if date_from and date_to:
+        query["date"] = {"$gte": date_from, "$lte": date_to}
+    elif date_from:
+        query["date"] = {"$gte": date_from}
+    elif date_to:
+        query["date"] = {"$lte": date_to}
+
+    docs = list(class_collection.find(query).sort([("date", 1), ("time_slot", 1)]))
+    return [_serialize_class(d) for d in docs]
+
+
+def get_class(class_id):
+    try:
+        doc = class_collection.find_one({"_id": ObjectId(class_id)})
+    except Exception:
+        return None
+    if not doc:
+        return None
+    return _serialize_class(doc)
+
+
+def delete_class(class_id, requested_by):
+    """Cancel (soft-delete) a class. Caller must verify admin first."""
+    try:
+        result = class_collection.update_one(
+            {"_id": ObjectId(class_id)},
+            {"$set": {
+                "status": "cancelled",
+                "cancelled_by": requested_by,
+                "updated_at": datetime.utcnow(),
+            }}
+        )
+    except Exception:
+        return None
+    if result.matched_count == 0:
+        return "Class not found"
+    return "Cancelled"
+
+
+def register_for_class(class_id, student_email):
+    """Atomically register a student for a class if seats remain."""
+    student_email = student_email.strip().lower()
+    try:
+        oid = ObjectId(class_id)
+    except Exception:
+        return "Class not found"
+
+    doc = class_collection.find_one({"_id": oid})
+    if not doc:
+        return "Class not found"
+    if doc.get("status") != "active":
+        return "Class is not active"
+
+    registered = doc.get("registered_students") or []
+    if student_email in registered:
+        return "Already registered"
+
+    capacity = int(doc.get("capacity", 0))
+    if len(registered) >= capacity:
+        return "Class is full"
+
+    # Atomic guard: only push if we still have a free seat and the student
+    # isn't yet in the list. The size check via $expr prevents a race.
+    result = class_collection.update_one(
+        {
+            "_id": oid,
+            "status": "active",
+            "registered_students": {"$ne": student_email},
+            "$expr": {"$lt": [{"$size": "$registered_students"}, "$capacity"]},
+        },
+        {
+            "$push": {"registered_students": student_email},
+            "$set": {"updated_at": datetime.utcnow()},
+        },
+    )
+    if result.modified_count == 0:
+        # Re-read to figure out which precondition failed.
+        doc = class_collection.find_one({"_id": oid})
+        if doc and student_email in (doc.get("registered_students") or []):
+            return "Already registered"
+        return "Class is full"
+
+    return "Registered"
+
+
+def unregister_from_class(class_id, student_email):
+    student_email = student_email.strip().lower()
+    try:
+        oid = ObjectId(class_id)
+    except Exception:
+        return "Class not found"
+
+    result = class_collection.update_one(
+        {"_id": oid},
+        {
+            "$pull": {"registered_students": student_email},
+            "$set": {"updated_at": datetime.utcnow()},
+        },
+    )
+    if result.matched_count == 0:
+        return "Class not found"
+    if result.modified_count == 0:
+        return "Not registered"
+    return "Unregistered"
+
+
+def get_my_classes(student_email):
+    """Active classes the student is registered for, soonest first."""
+    student_email = student_email.strip().lower()
+    docs = list(class_collection.find({
+        "registered_students": student_email,
+        "status": "active",
+    }).sort([("date", 1), ("time_slot", 1)]))
+    return [_serialize_class(d) for d in docs]

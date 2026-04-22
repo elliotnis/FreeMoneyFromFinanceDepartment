@@ -191,7 +191,12 @@ function Dashboard(){
                         <div className="card-icon">📅</div>
                         <span className="card-title">Register Session</span>
                     </button>
-                    
+
+                    <button className="action-card" onClick={() => navigate('/classes')}>
+                        <div className="card-icon">🎓</div>
+                        <span className="card-title">Classes</span>
+                    </button>
+
                     <button className="action-card" onClick={handleMySessionsClick}>
                         <div className="card-icon">📚</div>
                         <span className="card-title">My Sessions</span>

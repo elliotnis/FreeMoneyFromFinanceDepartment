@@ -384,3 +384,142 @@ select:focus {
         font-size: 30px;
     }
 }
+/* ============ Login mode tabs ============ */
+.login-mode-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--hkust-light-gray);
+    padding: 4px;
+    border-radius: 8px;
+    margin: 0 0 1.5rem;
+}
+
+.login-mode-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+
+.login-mode-tab:hover {
+    color: var(--hkust-blue);
+}
+
+.login-mode-tab.active {
+    background: #fff;
+    color: var(--hkust-blue);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+
+/* ============ Username + email suffix input ============ */
+.email-suffix-input {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.email-suffix-input:focus-within {
+    border-color: var(--hkust-blue);
+    box-shadow: 0 0 0 3px rgba(0, 56, 130, .12);
+}
+
+.email-suffix-input input {
+    flex: 1;
+    border: none;
+    padding: 12px 14px;
+    font-size: 1rem;
+    font-family: inherit;
+    outline: none;
+    background: transparent;
+    min-width: 0;
+}
+
+.email-suffix {
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    background: var(--hkust-light-gray);
+    color: #555;
+    font-size: 0.95rem;
+    border-left: 1px solid #d0d7de;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.input-hint {
+    margin-top: 6px;
+    color: #6a737d;
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.input-hint code {
+    background: var(--hkust-light-gray);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
+/* ============ "Check your inbox" confirmation ============ */
+.email-link-sent {
+    text-align: center;
+    padding: 1rem 0 0.5rem;
+}
+
+.email-link-sent-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    background: rgba(0, 56, 130, .08);
+    color: var(--hkust-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+}
+
+.email-link-sent h3 {
+    color: var(--hkust-blue);
+    margin-bottom: 0.5rem;
+}
+
+.email-link-sent p {
+    color: #444;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.login-btn-secondary {
+    background: transparent;
+    color: var(--hkust-blue);
+    border: 1px solid var(--hkust-blue);
+}
+
+.login-btn-secondary:hover {
+    background: rgba(0, 56, 130, .06);
+}
+
+/* Compact tabs on small screens */
+@media (max-width: 480px) {
+    .login-mode-tab {
+        font-size: 0.85rem;
+        padding: 9px 8px;
+    }
+
+    .email-suffix {
+        padding: 0 10px;
+        font-size: 0.85rem;
+    }
+}

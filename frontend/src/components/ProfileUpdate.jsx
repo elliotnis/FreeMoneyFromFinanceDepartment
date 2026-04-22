@@ -23,9 +23,14 @@ function ProfileUpdate() {
   const [loading, setLoading] = useState(false);
   const [fetchingProfile, setFetchingProfile] = useState(true);
   const [profileImagePreview, setProfileImagePreview] = useState(null);
+  const [canSetPassword, setCanSetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   // Get user email from localStorage or auth context
-  const userEmail = user?.email || localStorage.getItem('email');
+  const userEmail = user?.email || localStorage.getItem('user_email');
 
   useEffect(() => {
     if (!userEmail) {
@@ -33,7 +38,24 @@ function ProfileUpdate() {
       return;
     }
     fetchCurrentProfile();
+    fetchPasswordStatus();
   }, [userEmail, navigate]);
+
+  const fetchPasswordStatus = async () => {
+    if (!userEmail) return;
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const r = await fetch(
+        `${API_URL}/auth/password-status?email=${encodeURIComponent(userEmail)}`
+      );
+      if (r.ok) {
+        const data = await r.json();
+        setCanSetPassword(!!data.can_set_password);
+      }
+    } catch {
+      setCanSetPassword(false);
+    }
+  };
 
   const fetchCurrentProfile = async () => {
     try {
@@ -169,6 +191,39 @@ function ProfileUpdate() {
     }
   };
 
+  const handleSetPassword = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPasswordMessage('');
+    if (newPassword.length < 8) {
+      setPasswordMessage('Password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage('Passwords do not match.');
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const r = await fetch(`${API_URL}/auth/set-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail, new_password: newPassword }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || 'Could not save password');
+      setPasswordMessage(data.message || 'Password saved.');
+      setNewPassword('');
+      setConfirmPassword('');
+      setCanSetPassword(false);
+    } catch (err) {
+      setPasswordMessage(err.message);
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   if (fetchingProfile) {
     return (
       <div className="container">
@@ -187,7 +242,8 @@ function ProfileUpdate() {
 
   return (
     <div className="container">
-      <form className="login-form" onSubmit={handleSubmit}>
+      <div className="login-form">
+      <form onSubmit={handleSubmit}>
         <div className="logo-container">
           <div className="logo-text">
             <h1>HKUST</h1>
@@ -354,24 +410,71 @@ function ProfileUpdate() {
         <button type="submit" className="login-btn" disabled={loading}>
           {loading ? 'Updating Profile...' : 'Update Profile'}
         </button>
-
-        <div className="signup-link">
-          <button 
-            type="button" 
-            onClick={() => navigate('/dashboard')}
-            className="back-btn"
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: '#0066cc', 
-              textDecoration: 'underline',
-              cursor: 'pointer' 
-            }}
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
       </form>
+
+      {canSetPassword && (
+        <form
+          onSubmit={handleSetPassword}
+          style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #e2e8f0' }}
+        >
+          <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.05rem', color: '#003366' }}>
+            Create a sign-in password (optional)
+          </h3>
+          <p className="input-hint" style={{ marginBottom: '1rem' }}>
+            You signed in with an email link. Set a password here if you also want to use the <strong>Password</strong> tab on the login page.
+          </p>
+          {passwordMessage && (
+            <p className={passwordMessage.includes('saved') ? 'success-message' : 'error-message'} style={{ marginBottom: '0.75rem' }}>
+              {passwordMessage}
+            </p>
+          )}
+          <div className="input-group">
+            <label htmlFor="newPassword">New password</label>
+            <input
+              type="password"
+              id="newPassword"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+              minLength={8}
+            />
+          </div>
+          <div className="input-group">
+            <label htmlFor="confirmPassword">Confirm password</label>
+            <input
+              type="password"
+              id="confirmPassword"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Repeat password"
+              autoComplete="new-password"
+              minLength={8}
+            />
+          </div>
+          <button type="submit" className="login-btn" disabled={passwordLoading} style={{ marginTop: '0.5rem' }}>
+            {passwordLoading ? 'Saving…' : 'Save password'}
+          </button>
+        </form>
+      )}
+
+      <div className="signup-link">
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard')}
+          className="back-btn"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#0066cc',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+          }}
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+      </div>
     </div>
   );
 }

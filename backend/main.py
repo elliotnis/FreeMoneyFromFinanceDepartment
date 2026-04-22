@@ -17,10 +17,14 @@ else:
         "https://fina-sign-up-system.vercel.app",
     ]
 
+# Optional regex for managed hosts (e.g. Cloud Run: https://*.a.run.app)
+_cors_regex = os.getenv("CORS_ORIGIN_REGEX", "").strip() or None
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allow_origins,
+    allow_origin_regex=_cors_regex,
     allow_credentials=True,
     allow_methods=["*"],  # Allow all methods including OPTIONS
     allow_headers=["*"],

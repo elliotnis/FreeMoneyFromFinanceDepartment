@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from .utils import (
     check_email_exists, create_user, verify_user_credentials, get_all_users,
+    user_password_status, set_password_if_passwordless,
     create_user_profile, get_user_profile, update_user_profile, delete_user_profile,
     register_student_for_tutor_slot, cancel_student_registration_for_tutor_slot,
     # Tutor availability management functions
@@ -10,18 +11,31 @@ from .utils import (
     get_student_registrations,
     # Verification functions
     get_user_sessions_for_verification,
-    submit_reflection
+    submit_reflection,
+    # Admin + classes
+    is_admin,
+    create_class, list_classes, get_class, delete_class,
+    register_for_class, unregister_from_class, get_my_classes,
 )
+from .magic_link import (
+    create_magic_link, consume_magic_link, MagicLinkError,
+    build_email_address,
+)
+from .email_service import EmailConfigError, EmailSendError
 
     
 from .schema import (
     UserSignup, UserLogin, ProfileCreate, ProfileUpdate, ProfileResponse,
+    # Passwordless email-link login
+    EmailLinkRequest, EmailLinkVerify, SetPasswordRequest,
     # Tutor availability schemas
     TutorAvailabilityCreate, SessionTypesList,
     # Student registration schemas
     StudentSessionSelection, StudentCalendarView,
     # Verification schemas
-    ReflectionSubmit, ReflectionResponse, VerificationSessionResponse
+    ReflectionSubmit, ReflectionResponse, VerificationSessionResponse,
+    # Classes
+    ClassCreate, ClassRegister, ClassResponse,
 )
 
 
@@ -63,6 +77,91 @@ def login(user_data: UserLogin):
         "email": user_data.email,
         "user_id": str(user["_id"])
     }
+
+# ==================== Passwordless Email Login (HKUST magic link) ====================
+
+@router.post("/auth/email-link/request")
+def request_email_link(payload: EmailLinkRequest):
+    """Send a one-time sign-in link to <username>@connect.ust.hk."""
+    try:
+        result = create_magic_link(payload.username)
+    except MagicLinkError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except EmailConfigError as exc:
+        # Misconfigured server-side; surface a clear 500 so we don't pretend it worked.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email service is not configured: {exc}",
+        )
+    except EmailSendError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not send the sign-in email: {exc}",
+        )
+
+    return {
+        "message": f"Sign-in link sent to {result['email']}",
+        "email": result["email"],
+        "expires_at": result["expires_at"],
+    }
+
+
+@router.get("/auth/password-status")
+def password_status(email: str):
+    """Whether this account can set a first password (magic-link only users)."""
+    status = user_password_status(email)
+    if not status:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    return {
+        "has_password": status["has_password"],
+        "can_set_password": not status["has_password"],
+    }
+
+
+@router.post("/auth/set-password")
+def set_password_endpoint(payload: SetPasswordRequest):
+    """Let email-link-only users choose a password so they can use the Password tab."""
+    result = set_password_if_passwordless(payload.email, payload.new_password)
+    if result == "user_not_found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    if result == "already_has_password":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This account already has a password. Use login with your password.",
+        )
+    if result == "password_too_short":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters",
+        )
+    return {"success": True, "message": "Password saved. You can sign in with email and password."}
+
+
+@router.post("/auth/email-link/verify")
+def verify_email_link(payload: EmailLinkVerify):
+    """Consume a magic-link token; returns the same shape as POST /login."""
+    user = consume_magic_link(payload.token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This sign-in link is invalid, expired, or already used.",
+        )
+
+    return {
+        "message": "Login successful",
+        "email": user["email"],
+        "user_id": str(user["_id"]),
+    }
+
 
 @router.get("/users")
 def get_users():
@@ -444,3 +543,113 @@ def submit_session_reflection(reflection_data: ReflectionSubmit):
         "message": "Reflection submitted successfully",
         "reflection_id": result
     }
+
+
+# ==================== Admin Role Endpoint ====================
+
+@router.get("/me/role")
+def get_my_role(email: str):
+    """Tell the frontend whether this email is in the admin allow-list."""
+    return {"email": email, "is_admin": is_admin(email)}
+
+
+# ==================== Classes (admin-created group classes) ====================
+
+@router.post("/classes", response_model=ClassResponse)
+def create_class_endpoint(data: ClassCreate):
+    if not is_admin(data.created_by):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can create classes",
+        )
+
+    result = create_class(
+        title=data.title,
+        description=data.description,
+        date=data.date,
+        time_slot=data.time_slot,
+        location=data.location,
+        capacity=data.capacity,
+        created_by=data.created_by,
+    )
+
+    if isinstance(result, str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result,
+        )
+    return result
+
+
+@router.get("/classes")
+def list_classes_endpoint(date_from: str = None, date_to: str = None):
+    classes = list_classes(date_from=date_from, date_to=date_to)
+    return {"classes": classes, "total": len(classes)}
+
+
+@router.get("/classes/my/{student_email}")
+def my_classes_endpoint(student_email: str):
+    classes = get_my_classes(student_email)
+    return {
+        "student_email": student_email,
+        "classes": classes,
+        "total": len(classes),
+    }
+
+
+@router.get("/classes/{class_id}", response_model=ClassResponse)
+def get_class_endpoint(class_id: str):
+    cls = get_class(class_id)
+    if cls is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found",
+        )
+    return cls
+
+
+@router.delete("/classes/{class_id}")
+def delete_class_endpoint(class_id: str, requested_by: str):
+    if not is_admin(requested_by):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can cancel classes",
+        )
+    result = delete_class(class_id, requested_by)
+    if result is None or result == "Class not found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found",
+        )
+    return {"success": True, "message": "Class cancelled"}
+
+
+@router.post("/classes/{class_id}/register")
+def register_for_class_endpoint(class_id: str, payload: ClassRegister):
+    result = register_for_class(class_id, payload.student_email)
+    if result == "Class not found":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result)
+    if result == "Class is not active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+    if result == "Already registered":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result)
+    if result == "Class is full":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result)
+    if result != "Registered":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not register for class",
+        )
+    cls = get_class(class_id)
+    return {"success": True, "message": "Registered for class", "class": cls}
+
+
+@router.delete("/classes/{class_id}/register")
+def unregister_from_class_endpoint(class_id: str, payload: ClassRegister):
+    result = unregister_from_class(class_id, payload.student_email)
+    if result == "Class not found":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result)
+    if result == "Not registered":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+    cls = get_class(class_id)
+    return {"success": True, "message": "Unregistered from class", "class": cls}

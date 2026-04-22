@@ -20,8 +20,27 @@ Web app (Vite + React) and API (FastAPI). Data is stored in **MongoDB** (local v
 | `VITE_API_URL` | No | API base URL **as the browser sees it** (default `http://localhost:8000`). |
 | `FRONTEND_PORT` | No | Host port for the web UI (default `8080`). |
 | `CORS_ORIGINS` | No | Comma-separated origins. If **unset**, the API allows `http://localhost:5173`, `http://localhost:8080`, and a few defaults—see `backend/main.py`. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Yes for magic-link login | Gmail SMTP credentials. `SMTP_PASSWORD` must be a [Gmail App Password](https://myaccount.google.com/apppasswords), **not** your normal password. |
+| `FRONTEND_URL` | Yes for magic-link login | Public URL of the frontend (e.g. `http://localhost:8080`). Used to build the link inside the email. |
+| `MAGIC_LINK_TTL_MINUTES` | No (default 15) | Minutes before a magic-link token expires. |
+| `ADMIN_EMAILS` | Yes for managing classes | Comma-separated admin emails. Only these accounts can create / cancel classes. |
 
-**Local backend only:** copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and set `MONGODB_URL` (e.g. `mongodb://localhost:27017` or your Atlas URI).
+**Local backend only:** copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and set `MONGODB_URL` (e.g. `mongodb://localhost:27017` or your Atlas URI). The same `SMTP_*`, `FRONTEND_URL`, `MAGIC_LINK_TTL_MINUTES`, and `ADMIN_EMAILS` variables apply for non-Docker dev.
+
+### Setting up Gmail SMTP (one-time)
+
+1. Sign in to a Gmail account and turn on 2-step verification.
+2. Create an App Password at <https://myaccount.google.com/apppasswords> (16-char string).
+3. Set:
+
+   ```env
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your-gmail@gmail.com
+   SMTP_PASSWORD=the-16-char-app-password
+   SMTP_FROM=HKUST FINA Portal <your-gmail@gmail.com>
+   FRONTEND_URL=http://localhost:8080   # or your Vercel URL in prod
+   ```
 
 The frontend calls the API using `VITE_API_URL` (defaults to `http://localhost:8000` in code if unset). For `npm run dev`, that matches the backend on port **8000**.
 
@@ -82,6 +101,10 @@ npm run dev
 Optional: create `frontend/.env` with `VITE_API_URL=http://localhost:8000` if you need a non-default API URL.
 
 ---
+
+## Deploy to GCP (CI/CD)
+
+Pushes to **`main`** or **`master`** can deploy the API and web UI to **Google Cloud Run** via GitHub Actions. Configure GCP, Workload Identity Federation, and GitHub variables/secrets as described in **[docs/deploy-gcp.md](docs/deploy-gcp.md)**.
 
 ## Verify (optional, before push)
 
