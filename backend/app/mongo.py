@@ -16,13 +16,13 @@ try:
     session_collection = db["session_collection"]  # For storing session information
     registration_collection = db["registration_collection"]  # For storing session registrations
     reflection_collection = db["reflection_collection"]  # For storing session reflections/verifications
-    magic_link_collection = db["magic_link_collection"]  # For passwordless email sign-in tokens
+    magic_link_collection = db["magic_link_collection"]  # For passwordless email sign-in codes
     class_collection = db["class_collection"]  # For admin-created group classes
 
     # Indexes (idempotent — safe to run on every startup).
-    # TTL index auto-deletes expired magic links from the collection.
+    # TTL index auto-deletes expired email codes from the collection.
     magic_link_collection.create_index("expires_at", expireAfterSeconds=0)
-    magic_link_collection.create_index("token", unique=True)
+    magic_link_collection.create_index("token")
     # Helps the weekly classes calendar query.
     class_collection.create_index([("date", 1), ("status", 1)])
 

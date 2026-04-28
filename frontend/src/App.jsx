@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import LoginForm from './components/LoginForm'
 import SignupForm from './components/SignupForm'
-import MagicLinkVerify from './components/MagicLinkVerify'
 import ProfileCompletion from './components/ProfileCompletion'
 import ProfileUpdate from './components/ProfileUpdate'
 import Dashboard from './components/dashboard'
@@ -21,7 +20,6 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<SignupForm />} />
-        <Route path="/auth/verify" element={<MagicLinkVerify />} />
         <Route path="/complete-profile" element={<ProfileCompletion />} />
         <Route path="/profile" element={<ProfileUpdate />} />
         <Route path="/dashboard" element={<Dashboard />} />

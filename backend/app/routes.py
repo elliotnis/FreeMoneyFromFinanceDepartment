@@ -78,11 +78,11 @@ def login(user_data: UserLogin):
         "user_id": str(user["_id"])
     }
 
-# ==================== Passwordless Email Login (HKUST magic link) ====================
+# ==================== Passwordless Email Login (HKUST email code) ====================
 
 @router.post("/auth/email-link/request")
 def request_email_link(payload: EmailLinkRequest):
-    """Send a one-time sign-in link to <username>@connect.ust.hk."""
+    """Send a one-time sign-in code to <username>@connect.ust.hk."""
     try:
         result = create_magic_link(payload.username)
     except MagicLinkError as exc:
@@ -103,7 +103,7 @@ def request_email_link(payload: EmailLinkRequest):
         )
 
     return {
-        "message": f"Sign-in link sent to {result['email']}",
+        "message": f"Sign-in code sent to {result['email']}",
         "email": result["email"],
         "expires_at": result["expires_at"],
     }
@@ -148,12 +148,12 @@ def set_password_endpoint(payload: SetPasswordRequest):
 
 @router.post("/auth/email-link/verify")
 def verify_email_link(payload: EmailLinkVerify):
-    """Consume a magic-link token; returns the same shape as POST /login."""
-    user = consume_magic_link(payload.token)
+    """Consume a sign-in code; returns the same shape as POST /login."""
+    user = consume_magic_link(payload.code)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="This sign-in link is invalid, expired, or already used.",
+            detail="This sign-in code is invalid, expired, or already used.",
         )
 
     return {

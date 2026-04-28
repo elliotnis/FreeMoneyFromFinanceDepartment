@@ -1,13 +1,13 @@
-"""Magic-link login: passwordless auth for @connect.ust.hk emails.
+"""Passwordless email login for @connect.ust.hk emails.
 
 Flow:
-    1. `create_magic_link(username)` builds the email, generates a one-time
-       token, stores it in `magic_link_collection`, and emails the user a link.
-    2. The user clicks the link, frontend POSTs the token back, and we call
-       `consume_magic_link(token)` which marks it used and returns the user.
+    1. `create_magic_link(username)` validates the username, generates a short
+       numeric code, stores it in `magic_link_collection`, and emails the user.
+    2. The user enters the code on the website, frontend POSTs the code back, and
+       we call `consume_magic_link(code)` which marks it used and returns the user.
 
-A user record is auto-created on first use with `auth_method="email_link"`
-and `password=None` so existing password-based reads keep working.
+A user record is auto-created on first use with `auth_method="email_link"` and
+`password=None` so existing password-based reads keep working.
 """
 
 import os
@@ -20,6 +20,7 @@ from .mongo import magic_link_collection, user_collection
 
 EMAIL_DOMAIN = "connect.ust.hk"
 USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+CODE_LENGTH = 6
 
 
 class MagicLinkError(ValueError):
@@ -31,10 +32,6 @@ def _ttl_minutes() -> int:
         return max(1, int(os.getenv("MAGIC_LINK_TTL_MINUTES", "15")))
     except ValueError:
         return 15
-
-
-def _frontend_url() -> str:
-    return os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 
 
 def normalize_username(raw: str) -> str:
@@ -52,17 +49,26 @@ def build_email_address(username: str) -> str:
     return f"{normalize_username(username)}@{EMAIL_DOMAIN}"
 
 
+def _generate_code(length: int = CODE_LENGTH) -> str:
+    length = max(4, min(8, int(length)))
+    return f"{secrets.randbelow(10 ** length):0{length}d}"
+
+
 def create_magic_link(username: str) -> dict:
-    """Create + email a one-time sign-in link. Returns {email, expires_at}."""
+    """Create + email a one-time sign-in code. Returns {email, expires_at}."""
     email = build_email_address(username)
 
-    token = secrets.token_urlsafe(32)
+    code = _generate_code()
+    while magic_link_collection.find_one({"token": code, "used": False}):
+        code = _generate_code()
+
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=_ttl_minutes())
 
     magic_link_collection.insert_one(
         {
-            "token": token,
+            "token": code,
+            "code": code,
             "email": email,
             "created_at": now,
             "expires_at": expires_at,
@@ -71,23 +77,20 @@ def create_magic_link(username: str) -> dict:
         }
     )
 
-    link = f"{_frontend_url()}/auth/verify?token={token}"
-    subject = "Your HKUST FINA Portal sign-in link"
-    html_body = _render_email(email, link, _ttl_minutes())
+    subject = "Your HKUST FINA Portal sign-in code"
+    html_body = _render_email(email, code, _ttl_minutes())
     send_email(email, subject, html_body)
 
     return {"email": email, "expires_at": expires_at.isoformat()}
 
 
-def consume_magic_link(token: str) -> dict | None:
-    """Validate the token and return the (auto-created) user document."""
-    if not token or not isinstance(token, str):
+def consume_magic_link(code: str) -> dict | None:
+    """Validate the code and return the (auto-created) user document."""
+    if not code or not isinstance(code, str):
         return None
 
-    record = magic_link_collection.find_one({"token": token})
+    record = magic_link_collection.find_one({"token": code.strip(), "used": False})
     if not record:
-        return None
-    if record.get("used"):
         return None
 
     expires_at = record.get("expires_at")
@@ -120,7 +123,7 @@ def consume_magic_link(token: str) -> dict | None:
     return user
 
 
-def _render_email(email: str, link: str, ttl_minutes: int) -> str:
+def _render_email(email: str, code: str, ttl_minutes: int) -> str:
     return f"""\
 <!doctype html>
 <html>
@@ -128,18 +131,14 @@ def _render_email(email: str, link: str, ttl_minutes: int) -> str:
     <div style="max-width: 520px; margin: 24px auto; padding: 24px; border: 1px solid #eee; border-radius: 8px;">
       <h2 style="margin-top: 0; color: #003366;">HKUST FINA Portal</h2>
       <p>Hi <strong>{email}</strong>,</p>
-      <p>Click the button below to sign in. This link will expire in <strong>{ttl_minutes} minutes</strong> and can only be used once.</p>
-      <p style="text-align: center; margin: 32px 0;">
-        <a href="{link}"
-           style="background: #003366; color: #fff; text-decoration: none;
-                  padding: 12px 24px; border-radius: 6px; display: inline-block;
-                  font-weight: 600;">
-          Sign in to FINA Portal
-        </a>
+      <p>Your one-time sign-in code is:</p>
+      <p style="text-align: center; margin: 24px 0;">
+        <span style="display: inline-block; letter-spacing: 4px; font-size: 2rem; font-weight: 700; color: #003366;">
+          {code}
+        </span>
       </p>
       <p style="font-size: 13px; color: #666;">
-        If the button doesn't work, copy and paste this link into your browser:<br>
-        <a href="{link}">{link}</a>
+        Enter this code on the sign-in page within <strong>{ttl_minutes} minutes</strong>. This code can only be used once.
       </p>
       <p style="font-size: 12px; color: #999; margin-top: 32px;">
         If you didn't request this email, you can safely ignore it.

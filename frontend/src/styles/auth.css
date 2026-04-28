@@ -394,6 +394,10 @@ select:focus {
     margin: 0 0 1.5rem;
 }
 
+.auth-flow-panel {
+    animation: auth-panel-in 180ms ease-out both;
+}
+
 .login-mode-tab {
     flex: 1;
     background: transparent;
@@ -471,10 +475,123 @@ select:focus {
     font-size: 0.85em;
 }
 
+/* ============ OTP code inputs ============ */
+.otp-inputs {
+    display: grid;
+    grid-template-columns: repeat(6, 44px);
+    justify-content: center;
+    gap: 8px;
+    width: max-content;
+    margin: 0.5rem auto 0;
+}
+
+.otp-inputs input.otp-input {
+    width: 44px;
+    height: 44px;
+    text-align: center;
+    padding: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    border-radius: 6px;
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    color: #000;
+    animation: otp-cell-in 180ms ease-out both;
+}
+
+.otp-inputs input.otp-input:nth-child(2) {
+    animation-delay: 25ms;
+}
+
+.otp-inputs input.otp-input:nth-child(3) {
+    animation-delay: 50ms;
+}
+
+.otp-inputs input.otp-input:nth-child(4) {
+    animation-delay: 75ms;
+}
+
+.otp-inputs input.otp-input:nth-child(5) {
+    animation-delay: 100ms;
+}
+
+.otp-inputs input.otp-input:nth-child(6) {
+    animation-delay: 125ms;
+}
+
+.otp-inputs input.otp-input:focus {
+    outline: none;
+    border-color: var(--hkust-blue);
+    box-shadow: 0 0 0 3px rgba(0, 104, 255, 0.1);
+    background-color: #fff;
+}
+
+/* Keep OTP cells compact on very narrow screens */
+@media (max-width: 420px) {
+    .otp-inputs {
+        gap: 6px;
+    }
+
+    .otp-inputs input.otp-input {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+    }
+}
+
+.otp-actions {
+    display: grid;
+    gap: 0.6rem;
+}
+
+@keyframes auth-panel-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes auth-icon-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes otp-cell-in {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-flow-panel,
+    .email-link-sent,
+    .email-link-sent-icon,
+    .otp-inputs input.otp-input {
+        animation: none;
+    }
+}
+
 /* ============ "Check your inbox" confirmation ============ */
 .email-link-sent {
     text-align: center;
     padding: 1rem 0 0.5rem;
+    animation: auth-panel-in 220ms ease-out both;
 }
 
 .email-link-sent-icon {
@@ -488,6 +605,7 @@ select:focus {
     align-items: center;
     justify-content: center;
     font-size: 1.6rem;
+    animation: auth-icon-pop 240ms ease-out both;
 }
 
 .email-link-sent h3 {

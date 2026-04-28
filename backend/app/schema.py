@@ -15,7 +15,7 @@ class EmailLinkRequest(BaseModel):
     username: str  # part before @connect.ust.hk
 
 class EmailLinkVerify(BaseModel):
-    token: str
+    code: str
 
 class SetPasswordRequest(BaseModel):
     email: str
