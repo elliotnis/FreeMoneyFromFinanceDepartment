@@ -72,35 +72,25 @@ function Dashboard(){
         }
     };
     if (loading){
-        return <div>Loading...</div>
+        return (
+            <div className="dashboard-loading-screen">
+                <div className="dashboard-loading-mark">
+                    <i className="fas fa-chart-line"></i>
+                </div>
+                <span>Loading your dashboard...</span>
+            </div>
+        )
     }
-    // Get user info
-    const user_id = localStorage.getItem('user_id');
-   
-    
-    // Simple calendar - just show current month
+
     const currentDate = new Date();
-    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    const startingDayOfWeek = firstDayOfMonth.getDay();
-    
-    // Create simple days array
-    const daysToShow = [];
-    
-    // Add empty days for previous month
-    for (let i = 0; i < startingDayOfWeek; i++) {
-        daysToShow.push(null);
-    }
-    
-    // Add days of current month
-    for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
-        daysToShow.push(day);
-    }
-    
-    // Add empty days to fill grid (42 total)
-    while (daysToShow.length < 42) {
-        daysToShow.push(null);
-    }
+    const userEmail = localStorage.getItem('user_email') || 'HKUST Finance';
+    const initials = displayName
+        .split(' ')
+        .filter(Boolean)
+        .map((part) => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'S';
 
     // FOR MY SESSIONS BUTTON
     const handleMySessionsClick = () => {
@@ -124,22 +114,67 @@ function Dashboard(){
         });
     };
 
+    const quickActions = [
+        {
+            title: 'Create Sessions',
+            description: 'Open tutor scheduling tools and publish new slots.',
+            icon: 'fa-calendar-plus',
+            accent: 'blue',
+            onClick: () => navigate('/tutor-calendar'),
+        },
+        {
+            title: 'Register Session',
+            description: 'Browse available sessions and reserve your place.',
+            icon: 'fa-clipboard-check',
+            accent: 'green',
+            onClick: () => navigate('/register-session'),
+        },
+        {
+            title: 'Classes',
+            description: 'Review class calendars and department events.',
+            icon: 'fa-graduation-cap',
+            accent: 'gold',
+            onClick: () => navigate('/classes'),
+        },
+        {
+            title: 'My Sessions',
+            description: 'See upcoming bookings and session history.',
+            icon: 'fa-book-open',
+            accent: 'teal',
+            onClick: handleMySessionsClick,
+        },
+        {
+            title: 'Verification',
+            description: 'Complete or check your student verification.',
+            icon: 'fa-shield-halved',
+            accent: 'red',
+            onClick: () => navigate('/verification'),
+        },
+    ];
+
     return (
         <div className="dashboard-container">
             {/* Header */}
             <header className="dashboard-header">
                 <div className="header-content">
                     <div className="logo-section">
-                        <h1>HKUST FINA Department</h1>
-                        <span>Session Calendar</span>
+                        <div className="brand-mark" aria-hidden="true">
+                            <i className="fas fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <h1>HKUST FINA Department</h1>
+                            <span>Session Calendar</span>
+                        </div>
                     </div>
                     <div className="user-section">
                         <div className="user-info">
-                            <span className="user-name">Welcome, {displayName}!</span>
+                            <span className="user-name">Welcome, {displayName}</span>
+                            <span className="user-email">{userEmail}</span>
                             <button 
                                 className="profile-icon-btn"
                                 onClick={() => navigate('/profile')}
                                 title="Update Profile"
+                                aria-label="Update Profile"
                             >
                                 {profileLoading ? (
                                     <i className="fas fa-spinner fa-spin"></i>
@@ -163,51 +198,75 @@ function Dashboard(){
                                 navigate('/login');
                             }}
                         >
-                            Logout
+                            <i className="fas fa-arrow-right-from-bracket"></i>
+                            <span>Logout</span>
                         </button>
                     </div>
                 </div>
             </header>
             
-            {/* Hero Section with Gradient */}
-            <div className="dashboard-hero">
+            <section className="dashboard-hero" aria-labelledby="dashboard-greeting">
                 <div className="hero-content">
-                    <h1 className="greeting">{getGreeting()},</h1>
-                    <h2 className="greeting-name">{displayName}!</h2>
-                    <h3 className="motivation">Time to study midterms</h3>
+                    <p className="hero-eyebrow">
+                        <i className="fas fa-calendar-day"></i>
+                        {formatDate()}
+                    </p>
+                    <h1 className="greeting" id="dashboard-greeting">
+                        {getGreeting()}, <span>{displayName}</span>
+                    </h1>
+                    <p className="motivation">
+                        Manage FINA sessions, class schedules, and verification without digging through menus.
+                    </p>
+                    <div className="hero-meta-row">
+                        <span><i className="fas fa-bolt"></i> Ready for today</span>
+                        <span><i className="fas fa-location-dot"></i> HKUST</span>
+                    </div>
                 </div>
-            </div>
+                <aside className="hero-profile-card" aria-label="Profile summary">
+                    <div className="hero-avatar">
+                        {profilePicture ? (
+                            <img src={profilePicture} alt="" />
+                        ) : (
+                            <span>{initials}</span>
+                        )}
+                    </div>
+                    <div>
+                        <span className="hero-card-label">Signed in as</span>
+                        <strong>{displayName}</strong>
+                        <small>{userEmail}</small>
+                    </div>
+                </aside>
+            </section>
 
             {/* Main Content */}
-            <div className="dashboard-main">
+            <main className="dashboard-main">
+                <div className="dashboard-section-heading">
+                    <p>Quick actions</p>
+                    <h2>What do you want to do next?</h2>
+                </div>
                 {/* Quick Actions Grid */}
                 <div className="action-grid">
-                    <button className="action-card" onClick={() => navigate('/tutor-calendar')}>
-                        <div className="card-icon">➕</div>
-                        <span className="card-title">Create Sessions</span>
-                    </button>
-                    
-                    <button className="action-card" onClick={() => navigate('/register-session')}>
-                        <div className="card-icon">📅</div>
-                        <span className="card-title">Register Session</span>
-                    </button>
-
-                    <button className="action-card" onClick={() => navigate('/classes')}>
-                        <div className="card-icon">🎓</div>
-                        <span className="card-title">Classes</span>
-                    </button>
-
-                    <button className="action-card" onClick={handleMySessionsClick}>
-                        <div className="card-icon">📚</div>
-                        <span className="card-title">My Sessions</span>
-                    </button>
-                    
-                    <button className="action-card" onClick={() => navigate('/verification')}>
-                        <div className="card-icon">✓</div>
-                        <span className="card-title">Verification</span>
-                    </button>
+                    {quickActions.map((action, index) => (
+                        <button
+                            className={`action-card action-card-${action.accent}`}
+                            key={action.title}
+                            onClick={action.onClick}
+                            style={{ '--card-delay': `${120 + index * 70}ms` }}
+                        >
+                            <span className="card-icon" aria-hidden="true">
+                                <i className={`fas ${action.icon}`}></i>
+                            </span>
+                            <span className="card-copy">
+                                <span className="card-title">{action.title}</span>
+                                <span className="card-description">{action.description}</span>
+                            </span>
+                            <span className="card-arrow" aria-hidden="true">
+                                <i className="fas fa-arrow-right"></i>
+                            </span>
+                        </button>
+                    ))}
                 </div>
-            </div>
+            </main>
         </div>
     );
 }
