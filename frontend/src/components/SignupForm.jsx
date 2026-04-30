@@ -80,7 +80,7 @@ function SignupForm() {
             id="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="e.g. jsmith@connect.ust.hk"
+            placeholder="e.g. jsmith@connect.ust.hk or jsmith@ust.hk"
             required
           />
           <i className="fas fa-envelope input-icon"></i>

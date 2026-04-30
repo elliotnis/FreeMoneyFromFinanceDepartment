@@ -12,7 +12,8 @@ class UserLogin(BaseModel):
 
 # Passwordless email (magic-link) login
 class EmailLinkRequest(BaseModel):
-    username: str  # part before @connect.ust.hk
+    username: str  # part before the selected HKUST email domain
+    domain: Optional[str] = None  # connect.ust.hk by default; ust.hk also allowed
 
 class EmailLinkVerify(BaseModel):
     code: str

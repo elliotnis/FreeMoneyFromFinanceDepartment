@@ -461,6 +461,26 @@ select:focus {
     white-space: nowrap;
 }
 
+.email-suffix-input .email-domain-select {
+    width: auto;
+    min-width: 148px;
+    border: none;
+    border-left: 1px solid #d0d7de;
+    border-radius: 0;
+    padding: 0 34px 0 12px;
+    background-color: var(--hkust-light-gray);
+    color: #555;
+    font-size: 0.95rem;
+    box-shadow: none;
+    align-self: stretch;
+}
+
+.email-suffix-input .email-domain-select:focus {
+    outline: none;
+    box-shadow: none;
+    background-color: #fff;
+}
+
 .input-hint {
     margin-top: 6px;
     color: #6a737d;
@@ -529,6 +549,13 @@ select:focus {
 
 /* Keep OTP cells compact on very narrow screens */
 @media (max-width: 420px) {
+    .email-suffix-input .email-domain-select {
+        min-width: 124px;
+        padding-left: 8px;
+        padding-right: 28px;
+        font-size: 0.86rem;
+    }
+
     .otp-inputs {
         gap: 6px;
     }

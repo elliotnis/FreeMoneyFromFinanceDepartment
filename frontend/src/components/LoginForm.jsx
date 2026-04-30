@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/authcontext';
 import '../styles/auth.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const EMAIL_DOMAINS = ['connect.ust.hk', 'ust.hk'];
 
 function LoginForm() {
   const navigate = useNavigate();
@@ -162,7 +163,7 @@ function PasswordLogin({ navigate, login }) {
           id="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="e.g. jsmith@connect.ust.hk"
+          placeholder="e.g. jsmith@connect.ust.hk or jsmith@ust.hk"
           required
           disabled={loading}
         />
@@ -211,6 +212,7 @@ function PasswordLogin({ navigate, login }) {
 function EmailLinkLogin({ navigate }) {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
+  const [domain, setDomain] = useState(EMAIL_DOMAINS[0]);
   const [codeDigits, setCodeDigits] = useState(Array(6).fill(''));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -224,7 +226,7 @@ function EmailLinkLogin({ navigate }) {
       return false;
     }
     if (cleaned.includes('@')) {
-      setError("Just the part before '@connect.ust.hk' — no '@' needed.");
+      setError("Enter only the part before the domain, then choose @connect.ust.hk or @ust.hk.");
       return false;
     }
 
@@ -235,7 +237,7 @@ function EmailLinkLogin({ navigate }) {
       const response = await fetch(`${API_URL}/auth/email-link/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleaned }),
+        body: JSON.stringify({ username: cleaned, domain }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -486,10 +488,23 @@ function EmailLinkLogin({ navigate }) {
             required
             disabled={loading}
           />
-          <span className="email-suffix">@connect.ust.hk</span>
+          <select
+            id="hkust-email-domain"
+            className="email-domain-select"
+            value={domain}
+            onChange={(e) => setDomain(e.target.value)}
+            aria-label="HKUST email domain"
+            disabled={loading}
+          >
+            {EMAIL_DOMAINS.map((emailDomain) => (
+              <option key={emailDomain} value={emailDomain}>
+                @{emailDomain}
+              </option>
+            ))}
+          </select>
         </div>
         <p className="input-hint">
-          Enter only the part before <code>@connect.ust.hk</code>. We'll email you a one-time sign-in code.
+          Enter only the part before the domain. We'll email you a one-time sign-in code.
         </p>
       </div>
 

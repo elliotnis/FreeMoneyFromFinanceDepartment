@@ -19,7 +19,6 @@ from .utils import (
 )
 from .magic_link import (
     create_magic_link, consume_magic_link, MagicLinkError,
-    build_email_address,
 )
 from .email_service import EmailConfigError, EmailSendError
 
@@ -82,9 +81,9 @@ def login(user_data: UserLogin):
 
 @router.post("/auth/email-link/request")
 def request_email_link(payload: EmailLinkRequest):
-    """Send a one-time sign-in code to <username>@connect.ust.hk."""
+    """Send a one-time sign-in code to a supported HKUST email address."""
     try:
-        result = create_magic_link(payload.username)
+        result = create_magic_link(payload.username, payload.domain)
     except MagicLinkError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -1,8 +1,9 @@
-"""Passwordless email login for @connect.ust.hk emails.
+"""Passwordless email login for HKUST email addresses.
 
 Flow:
-    1. `create_magic_link(username)` validates the username, generates a short
-       numeric code, stores it in `magic_link_collection`, and emails the user.
+    1. `create_magic_link(username, domain)` validates the username/domain,
+       generates a short numeric code, stores it in `magic_link_collection`,
+       and emails the user.
     2. The user enters the code on the website, frontend POSTs the code back, and
        we call `consume_magic_link(code)` which marks it used and returns the user.
 
@@ -18,7 +19,11 @@ from datetime import datetime, timedelta, timezone
 from .email_service import send_email
 from .mongo import magic_link_collection, user_collection
 
-EMAIL_DOMAIN = "connect.ust.hk"
+ALLOWED_EMAIL_DOMAINS = ("connect.ust.hk", "ust.hk")
+DEFAULT_EMAIL_DOMAIN = ALLOWED_EMAIL_DOMAINS[0]
+ALLOWED_EMAIL_DOMAIN_LABEL = " or ".join(
+    f"@{domain}" for domain in ALLOWED_EMAIL_DOMAINS
+)
 USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 CODE_LENGTH = 6
 
@@ -38,15 +43,22 @@ def normalize_username(raw: str) -> str:
     username = (raw or "").strip().lower()
     if "@" in username:
         raise MagicLinkError(
-            "Enter only the part before @connect.ust.hk (no '@' needed)."
+            f"Enter only the part before the domain and choose {ALLOWED_EMAIL_DOMAIN_LABEL}."
         )
     if not USERNAME_RE.match(username):
         raise MagicLinkError("That doesn't look like a valid HKUST username.")
     return username
 
 
-def build_email_address(username: str) -> str:
-    return f"{normalize_username(username)}@{EMAIL_DOMAIN}"
+def normalize_domain(raw: str | None = None) -> str:
+    domain = (raw or DEFAULT_EMAIL_DOMAIN).strip().lower().lstrip("@")
+    if domain not in ALLOWED_EMAIL_DOMAINS:
+        raise MagicLinkError(f"Use an HKUST email domain: {ALLOWED_EMAIL_DOMAIN_LABEL}.")
+    return domain
+
+
+def build_email_address(username: str, domain: str | None = None) -> str:
+    return f"{normalize_username(username)}@{normalize_domain(domain)}"
 
 
 def _generate_code(length: int = CODE_LENGTH) -> str:
@@ -54,9 +66,9 @@ def _generate_code(length: int = CODE_LENGTH) -> str:
     return f"{secrets.randbelow(10 ** length):0{length}d}"
 
 
-def create_magic_link(username: str) -> dict:
+def create_magic_link(username: str, domain: str | None = None) -> dict:
     """Create + email a one-time sign-in code. Returns {email, expires_at}."""
-    email = build_email_address(username)
+    email = build_email_address(username, domain)
 
     code = _generate_code()
     while magic_link_collection.find_one({"token": code, "used": False}):
