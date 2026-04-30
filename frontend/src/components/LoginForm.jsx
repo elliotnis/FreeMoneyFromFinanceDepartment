@@ -219,6 +219,12 @@ function EmailLinkLogin({ navigate }) {
   const [sentTo, setSentTo] = useState('');
   const codeInputsRef = useRef([]);
 
+  const toggleDomain = () => {
+    setDomain((currentDomain) => (
+      currentDomain === EMAIL_DOMAINS[0] ? EMAIL_DOMAINS[1] : EMAIL_DOMAINS[0]
+    ));
+  };
+
   const requestCode = async () => {
     const cleaned = username.trim().toLowerCase();
     if (!cleaned) {
@@ -488,20 +494,16 @@ function EmailLinkLogin({ navigate }) {
             required
             disabled={loading}
           />
-          <select
+          <button
+            type="button"
             id="hkust-email-domain"
-            className="email-domain-select"
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            aria-label="HKUST email domain"
+            className="email-domain-toggle"
+            onClick={toggleDomain}
+            aria-label={`HKUST email domain, currently @${domain}. Click to switch.`}
             disabled={loading}
           >
-            {EMAIL_DOMAINS.map((emailDomain) => (
-              <option key={emailDomain} value={emailDomain}>
-                @{emailDomain}
-              </option>
-            ))}
-          </select>
+            @{domain}
+          </button>
         </div>
         <p className="input-hint">
           Enter only the part before the domain. We'll email you a one-time sign-in code.
