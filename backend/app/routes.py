@@ -18,7 +18,7 @@ from .utils import (
     register_for_class, unregister_from_class, get_my_classes,
 )
 from .magic_link import (
-    create_magic_link, consume_magic_link, MagicLinkError,
+    create_magic_link, create_magic_link_for_email, consume_magic_link, MagicLinkError,
 )
 from .email_service import EmailConfigError, EmailSendError
 
@@ -26,7 +26,7 @@ from .email_service import EmailConfigError, EmailSendError
 from .schema import (
     UserSignup, UserLogin, ProfileCreate, ProfileUpdate, ProfileResponse,
     # Passwordless email-link login
-    EmailLinkRequest, EmailLinkVerify, SetPasswordRequest,
+    EmailLinkRequest, EmailLinkVerify, TradingEmailCodeRequest, SetPasswordRequest,
     # Tutor availability schemas
     TutorAvailabilityCreate, SessionTypesList,
     # Student registration schemas
@@ -91,6 +91,38 @@ def request_email_link(payload: EmailLinkRequest):
         )
     except EmailConfigError as exc:
         # Misconfigured server-side; surface a clear 500 so we don't pretend it worked.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email service is not configured: {exc}",
+        )
+    except EmailSendError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not send the sign-in email: {exc}",
+        )
+
+    return {
+        "message": f"Sign-in code sent to {result['email']}",
+        "email": result["email"],
+        "expires_at": result["expires_at"],
+    }
+
+
+@router.post("/auth/trading/email-code/request")
+def request_trading_email_code(payload: TradingEmailCodeRequest):
+    """Send a one-time sign-in code to any valid email for the trading simulation."""
+    try:
+        result = create_magic_link_for_email(
+            payload.email,
+            subject="Your Student Trading Competition sign-in code",
+            title="Student Trading Competition",
+        )
+    except MagicLinkError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except EmailConfigError as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Email service is not configured: {exc}",

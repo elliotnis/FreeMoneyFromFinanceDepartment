@@ -12,7 +12,9 @@ if _cors_extra.strip():
 else:
     _allow_origins = [
         "http://localhost:5173",
+        "http://localhost:4173",
         "http://localhost:8080",
+        "http://127.0.0.1:4173",
         "http://127.0.0.1:8080",
         "https://fina-sign-up-system.vercel.app",
     ]
@@ -54,4 +56,3 @@ def health():
     return: A string "OK" if working
     """
     return "OK"
-

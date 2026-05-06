@@ -25,6 +25,7 @@ ALLOWED_EMAIL_DOMAIN_LABEL = " or ".join(
     f"@{domain}" for domain in ALLOWED_EMAIL_DOMAINS
 )
 USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CODE_LENGTH = 6
 
 
@@ -61,6 +62,13 @@ def build_email_address(username: str, domain: str | None = None) -> str:
     return f"{normalize_username(username)}@{normalize_domain(domain)}"
 
 
+def normalize_email(raw: str) -> str:
+    email = (raw or "").strip().lower()
+    if not EMAIL_RE.match(email):
+        raise MagicLinkError("Enter a valid email address.")
+    return email
+
+
 def _generate_code(length: int = CODE_LENGTH) -> str:
     length = max(4, min(8, int(length)))
     return f"{secrets.randbelow(10 ** length):0{length}d}"
@@ -69,6 +77,20 @@ def _generate_code(length: int = CODE_LENGTH) -> str:
 def create_magic_link(username: str, domain: str | None = None) -> dict:
     """Create + email a one-time sign-in code. Returns {email, expires_at}."""
     email = build_email_address(username, domain)
+    return create_magic_link_for_email(
+        email,
+        subject="Your HKUST FINA Portal sign-in code",
+        title="HKUST FINA Portal",
+    )
+
+
+def create_magic_link_for_email(
+    raw_email: str,
+    subject: str = "Your sign-in code",
+    title: str = "Sign-in code",
+) -> dict:
+    """Create + email a one-time sign-in code for a full email address."""
+    email = normalize_email(raw_email)
 
     code = _generate_code()
     while magic_link_collection.find_one({"token": code, "used": False}):
@@ -89,8 +111,7 @@ def create_magic_link(username: str, domain: str | None = None) -> dict:
         }
     )
 
-    subject = "Your HKUST FINA Portal sign-in code"
-    html_body = _render_email(email, code, _ttl_minutes())
+    html_body = _render_email(email, code, _ttl_minutes(), title)
     send_email(email, subject, html_body)
 
     return {"email": email, "expires_at": expires_at.isoformat()}
@@ -135,13 +156,13 @@ def consume_magic_link(code: str) -> dict | None:
     return user
 
 
-def _render_email(email: str, code: str, ttl_minutes: int) -> str:
+def _render_email(email: str, code: str, ttl_minutes: int, title: str = "HKUST FINA Portal") -> str:
     return f"""\
 <!doctype html>
 <html>
   <body style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #222; line-height: 1.5;">
     <div style="max-width: 520px; margin: 24px auto; padding: 24px; border: 1px solid #eee; border-radius: 8px;">
-      <h2 style="margin-top: 0; color: #003366;">HKUST FINA Portal</h2>
+      <h2 style="margin-top: 0; color: #003366;">{title}</h2>
       <p>Hi <strong>{email}</strong>,</p>
       <p>Your one-time sign-in code is:</p>
       <p style="text-align: center; margin: 24px 0;">

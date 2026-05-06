@@ -47,5 +47,13 @@ services:
     ports:
       - "${FRONTEND_PORT:-8080}:80"
 
+  trading-competition-sim:
+    build:
+      context: ./trading-competition-sim
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${TRADING_SIM_PORT:-4173}:80"
+
 volumes:
   mongo_data:

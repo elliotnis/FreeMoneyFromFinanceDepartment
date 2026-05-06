@@ -18,6 +18,9 @@ class EmailLinkRequest(BaseModel):
 class EmailLinkVerify(BaseModel):
     code: str
 
+class TradingEmailCodeRequest(BaseModel):
+    email: str
+
 class SetPasswordRequest(BaseModel):
     email: str
     new_password: str
